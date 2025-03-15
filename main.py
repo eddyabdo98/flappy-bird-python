@@ -14,9 +14,10 @@ WINDOW_HEIGHT = 600
 GRAVITY = 0.25
 FLAP_STRENGTH = -7
 PIPE_SPEED = 3
-PIPE_SPAWN_TIME = 1500  # milliseconds
+PIPE_SPAWN_TIME = 2000  # Increased spawn time to prevent overlapping
 PIPE_GAP = 150
 GROUND_HEIGHT = 100
+MIN_PIPE_DISTANCE = 200  # Minimum horizontal distance between pipes
 
 # Colors
 WHITE = (255, 255, 255)
@@ -47,8 +48,15 @@ class Bird:
         pygame.draw.rect(screen, (255, 255, 0), self.rect)  # Yellow bird
 
 class Pipe:
-    def __init__(self):
-        self.gap_y = random.randint(200, WINDOW_HEIGHT - 200)
+    def __init__(self, last_pipe_y=None):
+        # If there was a previous pipe, make sure the new one isn't too far in height
+        if last_pipe_y is not None:
+            min_y = max(200, last_pipe_y - 100)
+            max_y = min(WINDOW_HEIGHT - 200, last_pipe_y + 100)
+            self.gap_y = random.randint(min_y, max_y)
+        else:
+            self.gap_y = random.randint(200, WINDOW_HEIGHT - 200)
+            
         self.x = WINDOW_WIDTH
         self.width = 50
         self.passed = False
@@ -93,6 +101,12 @@ class Game:
         with open('high_score.txt', 'w') as f:
             f.write(str(self.high_score))
 
+    def can_spawn_pipe(self):
+        # Check if there are no pipes or if the last pipe is far enough
+        if not self.pipes:
+            return True
+        return self.pipes[-1].x <= WINDOW_WIDTH - MIN_PIPE_DISTANCE
+
     def handle_events(self):
         for event in pygame.event.get():
             if event.type == QUIT:
@@ -110,8 +124,9 @@ class Game:
 
             # Spawn new pipes
             now = pygame.time.get_ticks()
-            if now - self.last_pipe > PIPE_SPAWN_TIME:
-                self.pipes.append(Pipe())
+            if now - self.last_pipe > PIPE_SPAWN_TIME and self.can_spawn_pipe():
+                last_pipe_y = self.pipes[-1].gap_y if self.pipes else None
+                self.pipes.append(Pipe(last_pipe_y))
                 self.last_pipe = now
 
             # Update pipes and check collisions
